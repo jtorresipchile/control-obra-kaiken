@@ -1,0 +1,632 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Partidas - Obra Kaiken 2 (VºBº Cruzado)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between">
+
+    <div x-data="obraApp()" class="min-h-screen flex flex-col justify-between flex-grow">
+
+        <!-- PANTALLA DE LOGIN -->
+        <div x-show="!usuarioAutenticado" class="fixed inset-0 z-50 bg-slate-900 flex items-center justify-center p-4" style="display: none;">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 md:p-8 border border-slate-700">
+                <div class="text-center mb-6">
+                    <img src="assets/logo.png" alt="Logo Empresa" class="h-12 w-auto mx-auto mb-3 object-contain" onerror="this.style.display='none'">
+                    <h2 class="text-2xl font-black text-slate-900">Control de Partidas</h2>
+                    <p class="text-xs text-slate-500 mt-1">VºBº Cruzado (Capataz + Calidad) - Obra Kaiken 2</p>
+                </div>
+
+                <form @submit.prevent="iniciarSesion()" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Usuario</label>
+                        <input type="text" x-model="loginForm.usuario" required placeholder="jtorres" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Contraseña</label>
+                        <input type="password" x-model="loginForm.password" required placeholder="••••••••" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600">
+                    </div>
+
+                    <div x-show="errorLogin" class="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium" x-text="errorLogin"></div>
+
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm transition shadow-md flex justify-center items-center gap-2">
+                        <span>Iniciar Sesión</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- APLICACIÓN PRINCIPAL -->
+        <div x-show="usuarioAutenticado" class="flex-grow flex flex-col justify-between" style="display: none;">
+            <div>
+                <!-- Cabecera -->
+                <header class="bg-slate-900 text-white shadow-md py-4 px-6 mb-6">
+                    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div class="flex items-center gap-3">
+                            <img src="assets/logo.png" alt="Logo Empresa" class="h-10 w-auto object-contain bg-white/10 rounded p-1 border border-slate-700" onerror="this.style.display='none'">
+                            <div>
+                                <h1 class="text-xl font-bold tracking-wide">Control de Partidas por Vivienda</h1>
+                                <p class="text-xs text-slate-400">Gestión de Obra - Sincronizado con Firebase Cloud</p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-xs flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                <span>Usuario: <b class="text-white" x-text="usuarioAutenticado"></b> (<span x-text="rolUsuario"></span>)</span>
+                            </div>
+
+                            <template x-if="tienePermiso('gestionar_sistema')">
+                                <button @click="modalAdmin = true" class="bg-purple-600 hover:bg-purple-700 text-xs px-3 py-2 rounded font-medium transition flex items-center gap-1.5">
+                                    <span>⚙️ Panel Admin. Sistema</span>
+                                </button>
+                            </template>
+
+                            <button @click="cerrarSesion()" class="bg-rose-600 hover:bg-rose-700 text-xs px-3 py-2 rounded font-medium transition">
+                                Cerrar Sesión
+                            </button>
+                        </div>
+                    </div>
+                </header>
+
+                <main class="max-w-7xl mx-auto px-4 pb-12">
+                    <!-- Dashboard General -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-white p-4 rounded-lg shadow border border-slate-200">
+                            <p class="text-xs text-slate-500 uppercase font-semibold">Avance General de la Obra</p>
+                            <div class="flex items-center justify-between mt-2">
+                                <span class="text-2xl font-bold text-slate-700" x-text="porcentajeTotal + '%'"></span>
+                                <div class="w-2/3 bg-slate-200 rounded-full h-2.5">
+                                    <div class="bg-emerald-500 h-2.5 rounded-full transition-all duration-300" :style="`width: ${porcentajeTotal}%`"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg shadow border border-slate-200">
+                            <p class="text-xs text-slate-500 uppercase font-semibold">Total de Viviendas</p>
+                            <p class="text-2xl font-bold text-slate-700 mt-2" x-text="casas.length"></p>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg shadow border border-slate-200">
+                            <p class="text-xs text-slate-500 uppercase font-semibold">Partidas Totales</p>
+                            <p class="text-2xl font-bold text-slate-700 mt-2" x-text="partidas.length"></p>
+                        </div>
+                    </div>
+
+                    <!-- Filtros y Agregar Partida -->
+                    <div class="bg-white p-4 rounded-lg shadow border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            <input type="text" x-model="busqueda" placeholder="Buscar por número de casa..." class="border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 w-full sm:w-64">
+                            <select x-model="filtroModelo" class="border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500">
+                                <option value="">Todos los Modelos</option>
+                                <option value="140">Modelo 140</option>
+                                <option value="126">Modelo 126</option>
+                                <option value="107">Modelo 107</option>
+                            </select>
+                        </div>
+
+                        <template x-if="tienePermiso('crear_partidas')">
+                            <div class="flex items-center gap-2 w-full md:w-auto">
+                                <input type="text" x-model="nuevaPartidaNombre" placeholder="Nueva partida..." class="border border-slate-300 rounded px-3 py-1.5 text-sm flex-grow focus:outline-none focus:border-blue-500">
+                                <button @click="agregarPartida()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-1.5 rounded font-medium transition whitespace-nowrap">+ Partida</button>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Grilla de Tarjetas -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        <template x-for="casa in casasFiltradas" :key="casa.numero">
+                            <div @click="abrirCasa(casa)"
+                                 class="cursor-pointer bg-white rounded-xl shadow hover:shadow-md transition transform hover:-translate-y-1 border overflow-hidden flex flex-col justify-between"
+                                 :class="{
+                                     'border-emerald-300 hover:border-emerald-500': casa.modelo == 140,
+                                     'border-blue-300 hover:border-blue-500': casa.modelo == 126,
+                                     'border-rose-300 hover:border-rose-500': casa.modelo == 107
+                                 }">
+                                <div class="p-3 text-center border-b"
+                                    :class="{
+                                        'bg-emerald-50 text-emerald-900 border-emerald-200': casa.modelo == 140,
+                                        'bg-blue-50 text-blue-900 border-blue-200': casa.modelo == 126,
+                                        'bg-rose-50 text-rose-900 border-rose-200': casa.modelo == 107
+                                    }">
+                                    <span class="text-xs font-semibold uppercase tracking-wider block">Casa</span>
+                                    <span class="text-2xl font-black block" x-text="casa.numero"></span>
+                                    <span class="inline-block mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full"
+                                          :class="{
+                                              'bg-emerald-200 text-emerald-800': casa.modelo == 140,
+                                              'bg-blue-200 text-blue-800': casa.modelo == 126,
+                                              'bg-rose-200 text-rose-800': casa.modelo == 107
+                                          }" x-text="'Mod. ' + casa.modelo"></span>
+                                </div>
+
+                                <div class="p-3 text-center">
+                                    <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+                                        <span>Avance:</span>
+                                        <span class="font-bold text-slate-700" x-text="calcularAvanceCasa(casa.numero) + '%'"></span>
+                                    </div>
+                                    <div class="w-full bg-slate-200 rounded-full h-2">
+                                        <div class="bg-emerald-500 h-2 rounded-full transition-all duration-300" :style="`width: ${calcularAvanceCasa(casa.numero)}%`"></div>
+                                    </div>
+                                </div>
+
+                                <div class="bg-slate-50 px-3 py-2 text-center text-xs text-slate-500 font-medium border-t border-slate-100 flex items-center justify-center gap-1">
+                                    <span>Ver partidas</span>
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Modal Desglose Partidas (VºBº Cruzado por Rol) -->
+                    <div x-show="casaSeleccionada !== null" x-transition class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" style="display: none;">
+                        <div @click.outside="cerrarCasa()" class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+                            <div class="p-4 border-b flex justify-between items-center text-white"
+                                :class="{
+                                    'bg-emerald-700': casaSeleccionada && casaSeleccionada.modelo == 140,
+                                    'bg-blue-700': casaSeleccionada && casaSeleccionada.modelo == 126,
+                                    'bg-rose-700': casaSeleccionada && casaSeleccionada.modelo == 107,
+                                    'bg-slate-800': !casaSeleccionada
+                                }">
+                                <div>
+                                    <h2 class="text-xl font-bold" x-text="casaSeleccionada ? 'Inspección Casa ' + casaSeleccionada.numero : ''"></h2>
+                                    <p class="text-xs opacity-90" x-text="casaSeleccionada ? 'Modelo ' + casaSeleccionada.modelo + ' - Panel de Control Cruzado' : ''"></p>
+                                </div>
+                                <button @click="cerrarCasa()" class="text-white hover:bg-white/20 rounded-lg p-1.5 transition text-lg font-bold">✕</button>
+                            </div>
+
+                            <div class="p-4 overflow-y-auto space-y-3 flex-grow">
+                                <template x-for="(partida, index) in partidas" :key="index">
+                                    <div class="p-3 rounded-lg border transition flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50 border-slate-200">
+                                        
+                                        <!-- Nombre Partida -->
+                                        <div class="flex items-center gap-2 flex-grow">
+                                            <span class="font-bold text-slate-800 text-sm" x-text="partida"></span>
+                                            <template x-if="tienePermiso('crear_partidas')">
+                                                <button @click="eliminarPartida(index)" class="text-rose-400 hover:text-rose-600 text-xs font-bold px-1.5 py-1" title="Eliminar partida">✕</button>
+                                            </template>
+                                        </div>
+
+                                        <!-- VºBº Cruzado según el Rol Activo -->
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            
+                                            <!-- 1. SI ES CAPATAZ / SUPERVISOR -->
+                                            <template x-if="esCapataz()">
+                                                <label class="flex items-center gap-1.5 px-3 py-1.5 rounded border shadow-sm cursor-pointer"
+                                                       :class="vbSupervisorAprobado(partida) ? 'bg-amber-100 border-amber-400 text-amber-900' : 'bg-white border-slate-300 text-slate-700'">
+                                                    <input type="checkbox" 
+                                                           :checked="vbSupervisorAprobado(partida)"
+                                                           @change="cambiarVbSupervisor(partida)"
+                                                           class="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer">
+                                                    <span class="text-xs font-bold">✔ Dar VºBº Capataz</span>
+                                                </label>
+                                            </template>
+
+                                            <!-- 2. SI ES CONTROL DE CALIDAD -->
+                                            <template x-if="esCalidad()">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-xs px-2.5 py-1 rounded border font-semibold flex items-center gap-1"
+                                                          :class="vbSupervisorAprobado(partida) ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-slate-200 border-slate-300 text-slate-600'">
+                                                        <span x-text="vbSupervisorAprobado(partida) ? '👷‍♂️ Capataz: OK' : '👷‍♂️ Capataz: Pendiente'"></span>
+                                                    </span>
+
+                                                    <label class="flex items-center gap-1.5 px-3 py-1.5 rounded border shadow-sm cursor-pointer"
+                                                           :class="vbCalidadAprobado(partida) ? 'bg-emerald-100 border-emerald-400 text-emerald-900' : 'bg-white border-slate-300 text-slate-700'">
+                                                        <input type="checkbox" 
+                                                               :checked="vbCalidadAprobado(partida)"
+                                                               @change="cambiarVbCalidad(partida)"
+                                                               class="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer">
+                                                        <span class="text-xs font-bold">✔ Dar VºBº Calidad</span>
+                                                    </label>
+                                                </div>
+                                            </template>
+
+                                            <!-- 3. SI ES ADMIN -->
+                                            <template x-if="esAdmin()">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-xs px-2.5 py-1 rounded border font-semibold"
+                                                          :class="vbSupervisorAprobado(partida) ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-slate-100 border-slate-200 text-slate-500'"
+                                                          x-text="vbSupervisorAprobado(partida) ? '👷‍♂️ Capataz: OK' : '👷‍♂️ Capataz: Pendiente'">
+                                                    </span>
+
+                                                    <span class="text-xs px-2.5 py-1 rounded border font-semibold"
+                                                          :class="vbCalidadAprobado(partida) ? 'bg-emerald-100 border-emerald-300 text-emerald-900' : 'bg-slate-100 border-slate-200 text-slate-500'"
+                                                          x-text="vbCalidadAprobado(partida) ? '🔍 Calidad: OK' : '🔍 Calidad: Pendiente'">
+                                                    </span>
+                                                </div>
+                                            </template>
+
+                                        </div>
+
+                                    </div>
+                                </template>
+                            </div>
+
+                            <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+                                <span class="text-xs font-semibold text-slate-600" x-text="casaSeleccionada ? 'Avance Casa: ' + calcularAvanceCasa(casaSeleccionada.numero) + '%' : ''"></span>
+                                <button @click="cerrarCasa()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-4 py-2 rounded-lg font-medium transition">Listo / Cerrar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL DE ADMINISTRACIÓN DE SISTEMA -->
+                    <div x-show="modalAdmin" x-transition class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4" style="display: none;">
+                        <div @click.outside="modalAdmin = false" class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+                            <div class="p-4 bg-purple-900 text-white flex justify-between items-center">
+                                <h3 class="text-lg font-bold">⚙️ Panel de Administración de Sistema</h3>
+                                <button @click="modalAdmin = false" class="text-white hover:bg-white/20 p-1.5 rounded font-bold">✕</button>
+                            </div>
+
+                            <div class="p-6 overflow-y-auto space-y-6 flex-grow">
+                                <!-- Crear Nuevo Usuario -->
+                                <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                    <h4 class="font-bold text-slate-800 mb-3 text-sm">👤 Crear Nuevo Usuario y Asignar Rol</h4>
+                                    <form @submit.prevent="crearUsuario()" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                        <input type="text" x-model="nuevoUsuario.nombre" placeholder="Nombre de usuario" required class="border p-2 rounded text-xs">
+                                        <input type="password" x-model="nuevoUsuario.password" placeholder="Contraseña" required class="border p-2 rounded text-xs">
+                                        <select x-model="nuevoUsuario.rol" class="border p-2 rounded text-xs">
+                                            <template x-for="r in rolesDisponibles" :key="r">
+                                                <option :value="r" x-text="r"></option>
+                                            </template>
+                                        </select>
+                                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 rounded font-bold transition">Crear Usuario</button>
+                                    </form>
+                                </div>
+
+                                <!-- Listado de Usuarios -->
+                                <div>
+                                    <h4 class="font-bold text-slate-800 mb-2 text-sm">📋 Usuarios Registrados en el Sistema</h4>
+                                    <div class="border rounded-lg overflow-hidden">
+                                        <table class="w-full text-left text-xs">
+                                            <thead class="bg-slate-100 text-slate-700 border-b">
+                                                <tr>
+                                                    <th class="p-2.5">Usuario</th>
+                                                    <th class="p-2.5">Rol Asignado</th>
+                                                    <th class="p-2.5 text-right">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y">
+                                                <template x-for="(datos, usr) in usuariosSistema" :key="usr">
+                                                    <tr>
+                                                        <td class="p-2.5 font-medium" x-text="usr"></td>
+                                                        <td class="p-2.5">
+                                                            <span class="px-2 py-0.5 rounded font-semibold text-[11px]"
+                                                                :class="{
+                                                                    'bg-purple-100 text-purple-800': datos.rol === 'Administrador de Sistema',
+                                                                    'bg-blue-100 text-blue-800': datos.rol === 'Administrador de Obra',
+                                                                    'bg-amber-100 text-amber-800': datos.rol === 'Capataz',
+                                                                    'bg-emerald-100 text-emerald-800': datos.rol === 'Control de Calidad'
+                                                                }" x-text="usr === 'jtorres' ? 'Administrador de Sistema' : datos.rol"></span>
+                                                        </td>
+                                                        <td class="p-2.5 text-right">
+                                                            <button @click="eliminarUsuario(usr)" class="text-rose-600 hover:underline font-bold" x-show="usr !== 'jtorres'">Eliminar</button>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="p-4 bg-slate-100 border-t flex justify-end">
+                                <button @click="modalAdmin = false" class="bg-slate-800 text-white text-xs px-4 py-2 rounded font-bold hover:bg-slate-900">Cerrar Panel</button>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+
+            <footer class="bg-slate-900 text-slate-400 text-xs py-4 px-6 border-t border-slate-800 text-center mt-auto">
+                <p>Creado por <a href="https://www.civtek.cl/" target="_blank" class="text-blue-400 hover:underline font-medium">https://www.civtek.cl/</a> / Jose Torres Desarrollador 2026</p>
+            </footer>
+        </div>
+
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCY6aWnECP804DpCcVCcBurXrGxHKL-474",
+            authDomain: "estado-de-avance-obra.firebaseapp.com",
+            projectId: "estado-de-avance-obra",
+            storageBucket: "estado-de-avance-obra.firebasestorage.app",
+            messagingSenderId: "582427594917",
+            appId: "1:582427594917:web:b71dd4cabf9ba4e791fd4c"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        function obraApp() {
+            return {
+                busqueda: '',
+                filtroModelo: '',
+                nuevaPartidaNombre: '',
+                casaSeleccionada: null,
+                modalAdmin: false,
+                errorLogin: '',
+
+                loginForm: { usuario: '', password: '' },
+                usuarioAutenticado: localStorage.getItem('usuario_obra') || null,
+                rolUsuario: localStorage.getItem('rol_usuario') || 'Administrador de Sistema',
+
+                nuevoUsuario: { nombre: '', password: '', rol: 'Capataz' },
+                rolesDisponibles: ['Administrador de Sistema', 'Administrador de Obra', 'Capataz', 'Control de Calidad'],
+
+                usuariosSistema: {
+                    'jtorres': { password: 'jtorres123', rol: 'Administrador de Sistema' }
+                },
+
+                permisosRoles: {
+                    'Administrador de Sistema': ['gestionar_sistema', 'crear_partidas', 'eliminar_partidas'],
+                    'Administrador de Obra': ['crear_partidas', 'eliminar_partidas'],
+                    'Capataz': ['marcar_supervisor'],
+                    'Control de Calidad': ['marcar_calidad']
+                },
+
+                partidas: [
+                    'Instalación Puente Adherente Estuco',
+                    'Instalación Puente Adherente Yeso',
+                    'Instalación Lana Mineral'
+                ],
+
+                casas: [
+                    { numero: 1, modelo: 140 }, { numero: 39, modelo: 126 }, { numero: 40, modelo: 126 },
+                    { numero: 41, modelo: 126 }, { numero: 42, modelo: 107 }, { numero: 43, modelo: 107 },
+                    { numero: 44, modelo: 107 }, { numero: 45, modelo: 140 }, { numero: 46, modelo: 140 },
+                    { numero: 47, modelo: 107 }, { numero: 48, modelo: 107 }, { numero: 49, modelo: 107 },
+                    { numero: 50, modelo: 126 }, { numero: 51, modelo: 107 }, { numero: 52, modelo: 107 },
+                    { numero: 53, modelo: 107 }, { numero: 54, modelo: 126 }, { numero: 55, modelo: 126 },
+                    { numero: 56, modelo: 107 }, { numero: 57, modelo: 140 }, { numero: 58, modelo: 107 },
+                    { numero: 59, modelo: 107 }, { numero: 60, modelo: 126 }, { numero: 61, modelo: 126 },
+                    { numero: 62, modelo: 107 }, { numero: 63, modelo: 126 }, { numero: 64, modelo: 126 },
+                    { numero: 65, modelo: 107 }, { numero: 66, modelo: 126 }, { numero: 67, modelo: 126 },
+                    { numero: 68, modelo: 107 }, { numero: 69, modelo: 126 }, { numero: 70, modelo: 126 },
+                    { numero: 71, modelo: 107 }, { numero: 72, modelo: 107 }, { numero: 73, modelo: 107 },
+                    { numero: 74, modelo: 140 }
+                ],
+
+                estados: {},
+
+                init() {
+                    if (this.usuarioAutenticado) {
+                        if (this.usuarioAutenticado === 'jtorres') {
+                            this.rolUsuario = 'Administrador de Sistema';
+                            localStorage.setItem('rol_usuario', this.rolUsuario);
+                        }
+                        this.cargarDatosCloud();
+                    }
+                },
+
+                iniciarSesion() {
+                    this.errorLogin = '';
+                    const u = this.loginForm.usuario.trim();
+                    const p = this.loginForm.password.trim();
+
+                    db.collection("config").doc("sistema_usuarios").get().then(docSnap => {
+                        if (docSnap.exists) {
+                            this.usuariosSistema = docSnap.data().usuarios || this.usuariosSistema;
+                        }
+
+                        if (this.usuariosSistema['jtorres']) {
+                            this.usuariosSistema['jtorres'].rol = 'Administrador de Sistema';
+                        }
+
+                        if (this.usuariosSistema[u] && this.usuariosSistema[u].password === p) {
+                            this.usuarioAutenticado = u;
+                            this.rolUsuario = (u === 'jtorres') ? 'Administrador de Sistema' : this.usuariosSistema[u].rol;
+                            
+                            localStorage.setItem('usuario_obra', u);
+                            localStorage.setItem('rol_usuario', this.rolUsuario);
+                            this.loginForm = { usuario: '', password: '' };
+                            this.cargarDatosCloud();
+                        } else {
+                            this.errorLogin = 'Usuario o contraseña incorrectos.';
+                        }
+                    });
+                },
+
+                cerrarSesion() {
+                    localStorage.removeItem('usuario_obra');
+                    localStorage.removeItem('rol_usuario');
+                    this.usuarioAutenticado = null;
+                },
+
+                tienePermiso(accion) {
+                    const permisos = this.permisosRoles[this.rolUsuario] || [];
+                    return permisos.includes(accion);
+                },
+
+                esCapataz() {
+                    const r = (this.rolUsuario || '').toLowerCase();
+                    return r.includes('capataz') || r.includes('supervisor');
+                },
+
+                esCalidad() {
+                    const r = (this.rolUsuario || '').toLowerCase();
+                    return r.includes('calidad');
+                },
+
+                esAdmin() {
+                    const r = (this.rolUsuario || '').toLowerCase();
+                    return r.includes('administrador') || r.includes('sistema') || r.includes('obra');
+                },
+
+                async crearUsuario() {
+                    const usr = this.nuevoUsuario.nombre.trim();
+                    if (!usr) return;
+                    this.usuariosSistema[usr] = {
+                        password: this.nuevoUsuario.password.trim(),
+                        rol: this.nuevoUsuario.rol
+                    };
+                    await db.collection("config").doc("sistema_usuarios").set({
+                        usuarios: this.usuariosSistema
+                    }, { merge: true });
+
+                    alert("Usuario creado exitosamente.");
+                    this.nuevoUsuario = { nombre: '', password: '', rol: 'Capataz' };
+                },
+
+                async eliminarUsuario(usr) {
+                    if (confirm(`¿Eliminar al usuario ${usr}?`)) {
+                        delete this.usuariosSistema[usr];
+                        await db.collection("config").doc("sistema_usuarios").set({
+                            usuarios: this.usuariosSistema
+                        }, { merge: true });
+                    }
+                },
+
+                cargarDatosCloud() {
+                    db.collection("obra").doc("partidas").onSnapshot((snapshot) => {
+                        if (snapshot.exists) {
+                            this.partidas = snapshot.data().lista || [];
+                        }
+                    });
+
+                    db.collection("obra").doc("estados").onSnapshot((snapshot) => {
+                        if (snapshot.exists) {
+                            this.estados = snapshot.data().mapa || {};
+                        }
+                    });
+
+                    db.collection("config").doc("sistema_usuarios").onSnapshot((snapshot) => {
+                        if (snapshot.exists && snapshot.data().usuarios) {
+                            this.usuariosSistema = snapshot.data().usuarios;
+                            if (this.usuarioAutenticado === 'jtorres') {
+                                this.rolUsuario = 'Administrador de Sistema';
+                                localStorage.setItem('rol_usuario', this.rolUsuario);
+                            } else if (this.usuariosSistema[this.usuarioAutenticado]) {
+                                this.rolUsuario = this.usuariosSistema[this.usuarioAutenticado].rol;
+                                localStorage.setItem('rol_usuario', this.rolUsuario);
+                            }
+                        }
+                    });
+                },
+
+                abrirCasa(casa) { this.casaSeleccionada = casa; },
+                cerrarCasa() { this.casaSeleccionada = null; },
+
+                vbSupervisorAprobado(partida) {
+                    if (!this.casaSeleccionada) return false;
+                    const casaNum = this.casaSeleccionada.numero;
+                    if (!this.estados[casaNum] || !this.estados[casaNum][partida]) return false;
+                    return !!this.estados[casaNum][partida].supervisor;
+                },
+
+                vbCalidadAprobado(partida) {
+                    if (!this.casaSeleccionada) return false;
+                    const casaNum = this.casaSeleccionada.numero;
+                    if (!this.estados[casaNum] || !this.estados[casaNum][partida]) return false;
+                    return !!this.estados[casaNum][partida].calidad;
+                },
+
+                async cambiarVbSupervisor(partida) {
+                    if (!this.esCapataz() && !this.esAdmin()) return;
+                    if (!this.casaSeleccionada) return;
+
+                    const casaNum = this.casaSeleccionada.numero;
+                    if (!this.estados[casaNum]) this.estados[casaNum] = {};
+                    if (!this.estados[casaNum][partida]) this.estados[casaNum][partida] = { supervisor: false, calidad: false };
+
+                    const estadoActual = this.estados[casaNum][partida].supervisor || false;
+                    
+                    this.estados[casaNum][partida] = {
+                        ...this.estados[casaNum][partida],
+                        supervisor: !estadoActual
+                    };
+
+                    this.estados = { ...this.estados };
+                    await db.collection("obra").doc("estados").set({ mapa: this.estados }, { merge: true });
+                },
+
+                async cambiarVbCalidad(partida) {
+                    if (!this.esCalidad() && !this.esAdmin()) return;
+                    if (!this.casaSeleccionada) return;
+
+                    const casaNum = this.casaSeleccionada.numero;
+                    if (!this.estados[casaNum]) this.estados[casaNum] = {};
+                    if (!this.estados[casaNum][partida]) this.estados[casaNum][partida] = { supervisor: false, calidad: false };
+
+                    const estadoActual = this.estados[casaNum][partida].calidad || false;
+                    
+                    this.estados[casaNum][partida] = {
+                        ...this.estados[casaNum][partida],
+                        calidad: !estadoActual
+                    };
+
+                    this.estados = { ...this.estados };
+                    await db.collection("obra").doc("estados").set({ mapa: this.estados }, { merge: true });
+                },
+
+                calcularAvanceCasa(casaNum) {
+                    if (this.partidas.length === 0) return 0;
+                    if (!this.estados[casaNum]) return 0;
+
+                    let puntosTotales = this.partidas.length * 2;
+                    let puntosAlcanzados = 0;
+
+                    this.partidas.forEach(p => {
+                        const item = this.estados[casaNum][p];
+                        if (item) {
+                            if (item.supervisor) puntosAlcanzados += 1;
+                            if (item.calidad) puntosAlcanzados += 1;
+                        }
+                    });
+
+                    return Math.round((puntosAlcanzados / puntosTotales) * 100);
+                },
+
+                async agregarPartida() {
+                    if (!this.tienePermiso('crear_partidas') || !this.nuevaPartidaNombre.trim()) return;
+                    this.partidas.push(this.nuevaPartidaNombre.trim());
+                    this.nuevaPartidaNombre = '';
+                    await db.collection("obra").doc("partidas").set({ lista: this.partidas });
+                },
+
+                async eliminarPartida(index) {
+                    if (!this.tienePermiso('crear_partidas')) return;
+                    if (confirm('¿Eliminar esta partida de la obra?')) {
+                        const eliminada = this.partidas[index];
+                        this.partidas.splice(index, 1);
+                        for (let c in this.estados) {
+                            if (this.estados[c]) delete this.estados[c][eliminada];
+                        }
+                        this.estados = { ...this.estados };
+                        
+                        await db.collection("obra").doc("partidas").set({ lista: this.partidas });
+                        await db.collection("obra").doc("estados").set({ mapa: this.estados });
+                    }
+                },
+
+                get casasFiltradas() {
+                    return this.casas.filter(c => {
+                        const coincideBusqueda = this.busqueda === '' || c.numero.toString().includes(this.busqueda);
+                        const coincideModelo = this.filtroModelo === '' || c.modelo.toString() === this.filtroModelo;
+                        return coincideBusqueda && coincideModelo;
+                    });
+                },
+
+                get porcentajeTotal() {
+                    const totalPuntos = this.casas.length * this.partidas.length * 2;
+                    if (totalPuntos === 0) return 0;
+                    let puntosAlcanzados = 0;
+
+                    this.casas.forEach(c => {
+                        this.partidas.forEach(p => {
+                            const item = this.estados[c.numero] && this.estados[c.numero][p];
+                            if (item) {
+                                if (item.supervisor) puntosAlcanzados += 1;
+                                if (item.calidad) puntosAlcanzados += 1;
+                            }
+                        });
+                    });
+                    return Math.round((puntosAlcanzados / totalPuntos) * 100);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
