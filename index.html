@@ -651,8 +651,17 @@
 
                 cargarDatosCloud() {
                     db.collection("obra").doc("partidas").onSnapshot((snapshot) => {
-                        if (snapshot.exists && snapshot.data().lista) {
-                            this.partidas = snapshot.data().lista;
+                        if (snapshot.exists) {
+                            const listaCloud = snapshot.data().lista || [];
+                            if (listaCloud.length > 0) {
+                                this.partidas = listaCloud;
+                            } else {
+                                // Si está vacía en Firebase, inyecta automáticamente las 16 partidas maestras
+                                db.collection("obra").doc("partidas").set({ lista: this.partidas });
+                            }
+                        } else {
+                            // Si el documento no existe, lo crea con las 16 partidas
+                            db.collection("obra").doc("partidas").set({ lista: this.partidas });
                         }
                     });
 
