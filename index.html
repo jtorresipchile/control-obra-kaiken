@@ -92,12 +92,12 @@
                             <p class="text-2xl font-bold text-slate-700 mt-2" x-text="casas.length"></p>
                         </div>
                         <div class="bg-white p-4 rounded-lg shadow border border-slate-200">
-                            <p class="text-xs text-slate-500 uppercase font-semibold">Partidas Totales</p>
+                            <p class="text-xs text-slate-500 uppercase font-semibold">Partidas Principales</p>
                             <p class="text-2xl font-bold text-slate-700 mt-2" x-text="partidas.length"></p>
                         </div>
                     </div>
 
-                    <!-- Filtros y Agregar Partida -->
+                    <!-- Filtros y Agregar Partida (Exclusivo jtorres) -->
                     <div class="bg-white p-4 rounded-lg shadow border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
                         <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
                             <input type="text" x-model="busqueda" placeholder="Buscar por número de casa..." class="border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 w-full sm:w-64">
@@ -109,9 +109,9 @@
                             </select>
                         </div>
 
-                        <template x-if="tienePermiso('crear_partidas')">
+                        <template x-if="usuarioAutenticado === 'jtorres'">
                             <div class="flex items-center gap-2 w-full md:w-auto">
-                                <input type="text" x-model="nuevaPartidaNombre" placeholder="Nueva partida..." class="border border-slate-300 rounded px-3 py-1.5 text-sm flex-grow focus:outline-none focus:border-blue-500">
+                                <input type="text" x-model="nuevaPartidaNombre" placeholder="Nueva partida principal..." class="border border-slate-300 rounded px-3 py-1.5 text-sm flex-grow focus:outline-none focus:border-blue-500">
                                 <button @click="agregarPartida()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-1.5 rounded font-medium transition whitespace-nowrap">+ Partida</button>
                             </div>
                         </template>
@@ -121,12 +121,12 @@
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                         <template x-for="casa in casasFiltradas" :key="casa.numero">
                             <div @click="abrirCasa(casa)"
-                                 class="cursor-pointer bg-white rounded-xl shadow hover:shadow-md transition transform hover:-translate-y-1 border overflow-hidden flex flex-col justify-between"
-                                 :class="{
-                                     'border-emerald-300 hover:border-emerald-500': casa.modelo == 140,
-                                     'border-blue-300 hover:border-blue-500': casa.modelo == 126,
-                                     'border-rose-300 hover:border-rose-500': casa.modelo == 107
-                                 }">
+                                   class="cursor-pointer bg-white rounded-xl shadow hover:shadow-md transition transform hover:-translate-y-1 border overflow-hidden flex flex-col justify-between"
+                                   :class="{
+                                       'border-emerald-300 hover:border-emerald-500': casa.modelo == 140,
+                                       'border-blue-300 hover:border-blue-500': casa.modelo == 126,
+                                       'border-rose-300 hover:border-rose-500': casa.modelo == 107
+                                   }">
                                 <div class="p-3 text-center border-b"
                                     :class="{
                                         'bg-emerald-50 text-emerald-900 border-emerald-200': casa.modelo == 140,
@@ -161,9 +161,9 @@
                         </template>
                     </div>
 
-                    <!-- Modal Desglose Partidas (VºBº Cruzado por Rol) -->
+                    <!-- Modal Desglose Partidas y Subpartidas (VºBº Cruzado por Rol) -->
                     <div x-show="casaSeleccionada !== null" x-transition class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" style="display: none;">
-                        <div @click.outside="cerrarCasa()" class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+                        <div @click.outside="cerrarCasa()" class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
                             <div class="p-4 border-b flex justify-between items-center text-white"
                                 :class="{
                                     'bg-emerald-700': casaSeleccionada && casaSeleccionada.modelo == 140,
@@ -173,72 +173,88 @@
                                 }">
                                 <div>
                                     <h2 class="text-xl font-bold" x-text="casaSeleccionada ? 'Inspección Casa ' + casaSeleccionada.numero : ''"></h2>
-                                    <p class="text-xs opacity-90" x-text="casaSeleccionada ? 'Modelo ' + casaSeleccionada.modelo + ' - Panel de Control Cruzado' : ''"></p>
+                                    <p class="text-xs opacity-90" x-text="casaSeleccionada ? 'Modelo ' + casaSeleccionada.modelo + ' - Desglose de Partidas y Subpartidas' : ''"></p>
                                 </div>
                                 <button @click="cerrarCasa()" class="text-white hover:bg-white/20 rounded-lg p-1.5 transition text-lg font-bold">✕</button>
                             </div>
 
-                            <div class="p-4 overflow-y-auto space-y-3 flex-grow">
-                                <template x-for="(partida, index) in partidas" :key="index">
-                                    <div class="p-3 rounded-lg border transition flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50 border-slate-200">
+                            <div class="p-4 overflow-y-auto space-y-4 flex-grow">
+                                <template x-for="(partida, pIndex) in partidas" :key="pIndex">
+                                    <div class="p-4 rounded-lg border bg-slate-50 border-slate-200 shadow-sm">
                                         
-                                        <!-- Nombre Partida -->
-                                        <div class="flex items-center gap-2 flex-grow">
-                                            <span class="font-bold text-slate-800 text-sm" x-text="partida"></span>
-                                            <template x-if="tienePermiso('crear_partidas')">
-                                                <button @click="eliminarPartida(index)" class="text-rose-400 hover:text-rose-600 text-xs font-bold px-1.5 py-1" title="Eliminar partida">✕</button>
+                                        <!-- Cabecera de Partida Principal -->
+                                        <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-200">
+                                            <div class="flex items-center gap-2">
+                                                <span class="bg-slate-800 text-white text-xs px-2 py-0.5 rounded font-bold" x-text="'#' + (pIndex + 1)"></span>
+                                                <span class="font-bold text-slate-900 text-sm md:text-base" x-text="partida.nombre"></span>
+                                            </div>
+                                            <template x-if="usuarioAutenticado === 'jtorres'">
+                                                <button @click="eliminarPartida(pIndex)" class="text-rose-500 hover:text-rose-700 text-xs font-bold px-2 py-1 bg-white border border-rose-200 rounded shadow-sm" title="Eliminar partida">Eliminar Partida</button>
                                             </template>
                                         </div>
 
-                                        <!-- VºBº Cruzado según el Rol Activo -->
-                                        <div class="flex flex-wrap items-center gap-3">
-                                            
-                                            <!-- 1. SI ES CAPATAZ / SUPERVISOR -->
-                                            <template x-if="esCapataz()">
-                                                <label class="flex items-center gap-1.5 px-3 py-1.5 rounded border shadow-sm cursor-pointer"
-                                                       :class="vbSupervisorAprobado(partida) ? 'bg-amber-100 border-amber-400 text-amber-900' : 'bg-white border-slate-300 text-slate-700'">
-                                                    <input type="checkbox" 
-                                                           :checked="vbSupervisorAprobado(partida)"
-                                                           @change="cambiarVbSupervisor(partida)"
-                                                           class="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer">
-                                                    <span class="text-xs font-bold">✔ Dar VºBº Capataz</span>
-                                                </label>
-                                            </template>
+                                        <!-- Listado de Subpartidas -->
+                                        <div class="space-y-2 pl-2 md:pl-4">
+                                            <template x-for="(sub, sIndex) in partida.subpartidas" :key="sIndex">
+                                                <div class="p-2.5 rounded border transition flex flex-col md:flex-row md:items-center justify-between gap-2 bg-white border-slate-200">
+                                                    
+                                                    <div class="flex items-center gap-2 flex-grow">
+                                                        <span class="text-xs text-slate-500 font-semibold" x-text="'- ' + sub.nombre"></span>
+                                                    </div>
 
-                                            <!-- 2. SI ES CONTROL DE CALIDAD -->
-                                            <template x-if="esCalidad()">
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-xs px-2.5 py-1 rounded border font-semibold flex items-center gap-1"
-                                                          :class="vbSupervisorAprobado(partida) ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-slate-200 border-slate-300 text-slate-600'">
-                                                        <span x-text="vbSupervisorAprobado(partida) ? '👷‍♂️ Capataz: OK' : '👷‍♂️ Capataz: Pendiente'"></span>
-                                                    </span>
+                                                    <!-- VºBº Cruzado por Rol en cada Subpartida -->
+                                                    <div class="flex flex-wrap items-center gap-3">
+                                                        
+                                                        <!-- 1. SI ES CAPATAZ / SUPERVISOR -->
+                                                        <template x-if="esCapataz()">
+                                                            <label class="flex items-center gap-1.5 px-2.5 py-1 rounded border shadow-sm cursor-pointer"
+                                                                   :class="vbSupervisorAprobado(partida.nombre, sub.nombre) ? 'bg-amber-100 border-amber-400 text-amber-900' : 'bg-slate-50 border-slate-300 text-slate-700'">
+                                                                <input type="checkbox" 
+                                                                       :checked="vbSupervisorAprobado(partida.nombre, sub.nombre)"
+                                                                       @change="cambiarVbSupervisor(partida.nombre, sub.nombre)"
+                                                                       class="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer">
+                                                                <span class="text-xs font-bold">✔ VºBº Capataz</span>
+                                                            </label>
+                                                        </template>
 
-                                                    <label class="flex items-center gap-1.5 px-3 py-1.5 rounded border shadow-sm cursor-pointer"
-                                                           :class="vbCalidadAprobado(partida) ? 'bg-emerald-100 border-emerald-400 text-emerald-900' : 'bg-white border-slate-300 text-slate-700'">
-                                                        <input type="checkbox" 
-                                                               :checked="vbCalidadAprobado(partida)"
-                                                               @change="cambiarVbCalidad(partida)"
-                                                               class="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer">
-                                                        <span class="text-xs font-bold">✔ Dar VºBº Calidad</span>
-                                                    </label>
+                                                        <!-- 2. SI ES CONTROL DE CALIDAD -->
+                                                        <template x-if="esCalidad()">
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="text-xs px-2 py-1 rounded border font-semibold"
+                                                                      :class="vbSupervisorAprobado(partida.nombre, sub.nombre) ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-slate-100 border-slate-200 text-slate-500'"
+                                                                      x-text="vbSupervisorAprobado(partida.nombre, sub.nombre) ? '👷‍♂️ Cap: OK' : '👷‍♂️ Cap: Pend.'">
+                                                                </span>
+
+                                                                <label class="flex items-center gap-1.5 px-2.5 py-1 rounded border shadow-sm cursor-pointer"
+                                                                       :class="vbCalidadAprobado(partida.nombre, sub.nombre) ? 'bg-emerald-100 border-emerald-400 text-emerald-900' : 'bg-slate-50 border-slate-300 text-slate-700'">
+                                                                    <input type="checkbox" 
+                                                                           :checked="vbCalidadAprobado(partida.nombre, sub.nombre)"
+                                                                           @change="cambiarVbCalidad(partida.nombre, sub.nombre)"
+                                                                           class="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer">
+                                                                    <span class="text-xs font-bold">✔ VºBº Calidad</span>
+                                                                </label>
+                                                            </div>
+                                                        </template>
+
+                                                        <!-- 3. SI ES ADMIN -->
+                                                        <template x-if="esAdmin()">
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="text-xs px-2 py-1 rounded border font-semibold"
+                                                                      :class="vbSupervisorAprobado(partida.nombre, sub.nombre) ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-slate-100 border-slate-200 text-slate-500'"
+                                                                      x-text="vbSupervisorAprobado(partida.nombre, sub.nombre) ? '👷‍♂️ Cap: OK' : '👷‍♂️ Cap: Pend.'">
+                                                                </span>
+
+                                                                <span class="text-xs px-2 py-1 rounded border font-semibold"
+                                                                      :class="vbCalidadAprobado(partida.nombre, sub.nombre) ? 'bg-emerald-100 border-emerald-300 text-emerald-900' : 'bg-slate-100 border-slate-200 text-slate-500'"
+                                                                      x-text="vbCalidadAprobado(partida.nombre, sub.nombre) ? '🔍 Cal: OK' : '🔍 Cal: Pend.'">
+                                                                </span>
+                                                            </div>
+                                                        </template>
+
+                                                    </div>
+
                                                 </div>
                                             </template>
-
-                                            <!-- 3. SI ES ADMIN -->
-                                            <template x-if="esAdmin()">
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-xs px-2.5 py-1 rounded border font-semibold"
-                                                          :class="vbSupervisorAprobado(partida) ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-slate-100 border-slate-200 text-slate-500'"
-                                                          x-text="vbSupervisorAprobado(partida) ? '👷‍♂️ Capataz: OK' : '👷‍♂️ Capataz: Pendiente'">
-                                                    </span>
-
-                                                    <span class="text-xs px-2.5 py-1 rounded border font-semibold"
-                                                          :class="vbCalidadAprobado(partida) ? 'bg-emerald-100 border-emerald-300 text-emerald-900' : 'bg-slate-100 border-slate-200 text-slate-500'"
-                                                          x-text="vbCalidadAprobado(partida) ? '🔍 Calidad: OK' : '🔍 Calidad: Pendiente'">
-                                                    </span>
-                                                </div>
-                                            </template>
-
                                         </div>
 
                                     </div>
@@ -362,15 +378,169 @@
 
                 permisosRoles: {
                     'Administrador de Sistema': ['gestionar_sistema', 'crear_partidas', 'eliminar_partidas'],
-                    'Administrador de Obra': ['crear_partidas', 'eliminar_partidas'],
+                    'Administrador de Obra': [],
                     'Capataz': ['marcar_supervisor'],
                     'Control de Calidad': ['marcar_calidad']
                 },
 
+                // 16 Partidas Maestras con Subpartidas Integradas
                 partidas: [
-                    'Instalación Puente Adherente Estuco',
-                    'Instalación Puente Adherente Yeso',
-                    'Instalación Lana Mineral'
+                    {
+                        nombre: "1. Preparación de muros y superficies",
+                        subpartidas: [
+                            { nombre: "Limpieza de muros de albañilería" },
+                            { nombre: "Quemado de muros" },
+                            { nombre: "Reparación de imperfecciones de albañilería" },
+                            { nombre: "Retiro de excedentes de mortero" },
+                            { nombre: "Regularización de superficies" },
+                            { nombre: "Trazado de tabiquerías primer piso" },
+                            { nombre: "Trazado de tabiquerías segundo piso" },
+                            { nombre: "Revisión de niveles y plomos" },
+                            { nombre: "Preparación de vanos de puertas y ventanas" }
+                        ]
+                    },
+                    {
+                        nombre: "2. Estructura y tabiquería Metalcon",
+                        subpartidas: [
+                            { nombre: "Trazado de tabiquería Metalcon (Primer piso)" },
+                            { nombre: "Instalación de soleras (Primer piso)" },
+                            { nombre: "Instalación de montantes (Primer piso)" },
+                            { nombre: "Instalación de refuerzos interiores (Primer piso)" },
+                            { nombre: "Instalación de dinteles (Primer piso)" },
+                            { nombre: "Estructura de vanos de puertas y ventanas (Primer piso)" },
+                            { nombre: "Montaje de estructura Metalcon exterior (Segundo piso)" },
+                            { nombre: "Instalación de soleras y montantes (Segundo piso)" },
+                            { nombre: "Instalación de refuerzos estructurales y dinteles (Segundo piso)" },
+                            { nombre: "Tabiquería interior Metalcon (Segundo piso)" },
+                            { nombre: "Revisión de escuadras, niveles y plomos" }
+                        ]
+                    },
+                    {
+                        nombre: "3. Revestimiento exterior del segundo piso",
+                        subpartidas: [
+                            { nombre: "Instalación de placas OSB" },
+                            { nombre: "Instalación de barrera hidrófuga y cortaviento" },
+                            { nombre: "Instalación de placas Volcanboard" },
+                            { nombre: "Tratamiento de juntas" },
+                            { nombre: "Instalación de esquineros y perfiles" },
+                            { nombre: "Sellado de encuentros y preparación exterior" }
+                        ]
+                    },
+                    {
+                        nombre: "4. Instalaciones embutidas y aislaciones",
+                        subpartidas: [
+                            { nombre: "Instalación de tuberías de agua potable y alcantarillado" },
+                            { nombre: "Instalación de redes de gas" },
+                            { nombre: "Instalación de canalizaciones y cajas eléctricas" },
+                            { nombre: "Instalación de canalizaciones de corrientes débiles" },
+                            { nombre: "Instalación de aislación térmica y acústica" },
+                            { nombre: "Pruebas de instalaciones previas a cierre" }
+                        ]
+                    },
+                    {
+                        nombre: "5. Revestimientos interiores",
+                        subpartidas: [
+                            { nombre: "Instalación de planchas Volcanita, Volcapol y RH (Primer piso)" },
+                            { nombre: "Instalación de planchas de cielo (Primer piso)" },
+                            { nombre: "Tratamiento de juntas, empastado y lijado (Primer piso)" },
+                            { nombre: "Instalación de planchas Volcanita, Volcapol y RH (Segundo piso)" },
+                            { nombre: "Instalación de cielos y empastado (Segundo piso)" }
+                        ]
+                    },
+                    {
+                        nombre: "6. Terminaciones exteriores",
+                        subpartidas: [
+                            { nombre: "Preparación de muros exteriores y sistema EIFS" },
+                            { nombre: "Instalación de placas aislantes, malla y base coat" },
+                            { nombre: "Aplicación de revestimiento final EIFS y pintura" },
+                            { nombre: "Instalación de tapacanes, hojalatería, canaletas y bajadas" },
+                            { nombre: "Sellado de encuentros de fachada" }
+                        ]
+                    },
+                    {
+                        nombre: "7. Impermeabilizaciones y revestimientos de baños y cocina",
+                        subpartidas: [
+                            { nombre: "Preparación e impermeabilización de pisos y muros de duchas" },
+                            { nombre: "Instalación de cerámica en muros y pisos de baños" },
+                            { nombre: "Instalación de cerámica en cocina y porcelanato en pisos" },
+                            { nombre: "Fragüado, sellado y guardapolvos cerámicos" }
+                        ]
+                    },
+                    {
+                        nombre: "8. Pavimentos interiores",
+                        subpartidas: [
+                            { nombre: "Preparación, limpieza y nivelación de radieres" },
+                            { nombre: "Aplicación de autonivelante e instalación de piso flotante" },
+                            { nombre: "Instalación de guardapolvos, cubrejuntas y umbrales" }
+                        ]
+                    },
+                    {
+                        nombre: "9. Instalación de puertas y ventanas",
+                        subpartidas: [
+                            { nombre: "Instalación y sellado perimetral de ventanas" },
+                            { nombre: "Instalación de puertas exteriores y marcos interiores" },
+                            { nombre: "Instalación de puertas interiores, cerraduras y bisagras" }
+                        ]
+                    },
+                    {
+                        nombre: "10. Pinturas interiores",
+                        subpartidas: [
+                            { nombre: "Preparación de muros, sellador y aparejo" },
+                            { nombre: "Aplicación de manos de pintura en cielos y muros" },
+                            { nombre: "Pintura de puertas, marcos y retoques" }
+                        ]
+                    },
+                    {
+                        nombre: "11. Instalaciones eléctricas y corrientes débiles",
+                        subpartidas: [
+                            { nombre: "Cableado, tablero eléctrico, automáticos y diferenciales" },
+                            { nombre: "Instalación de enchufes, interruptores y luminarias" },
+                            { nombre: "Timbre, citófono, puntos de TV/datos y medidor" }
+                        ]
+                    },
+                    {
+                        nombre: "12. Instalaciones sanitarias y gas",
+                        subpartidas: [
+                            { nombre: "Medidores, conexión de agua potable y alcantarillado" },
+                            { nombre: "Pruebas de presión de agua y estanqueidad" },
+                            { nombre: "Instalación de WC, vanitorios, lavamanos, griferías y duchas" },
+                            { nombre: "Sifones, accesorios de baño, lavaplatos y pruebas finales" }
+                        ]
+                    },
+                    {
+                        nombre: "13. Instalación de artefactos y equipamiento de cocina",
+                        subpartidas: [
+                            { nombre: "Instalación de muebles base, aéreos y cubiertas" },
+                            { nombre: "Instalación de lavaplatos, grifería, encimera, horno y campana" },
+                            { nombre: "Conexiones eléctricas/gas y sellado de cubiertas" }
+                        ]
+                    },
+                    {
+                        nombre: "14. Obras exteriores y urbanización",
+                        subpartidas: [
+                            { nombre: "Preparación de terreno, excavaciones y redes exteriores" },
+                            { nombre: "Instalación de cámaras de inspección, eléctricas y medidores" },
+                            { nombre: "Construcción de veredas y accesos peatonales/vehiculares" },
+                            { nombre: "Pavimentación exterior, cierre perimetral y portones" }
+                        ]
+                    },
+                    {
+                        nombre: "15. Terminaciones finales y entrega",
+                        subpartidas: [
+                            { nombre: "Espejos, accesorios, numeración y rejillas de ventilación" },
+                            { nombre: "Sellos de silicona y revisión general" },
+                            { nombre: "Limpieza fina, levantamiento de observaciones y recepción" }
+                        ]
+                    },
+                    {
+                        nombre: "16. Partidas adicionales de techumbre y especiales",
+                        subpartidas: [
+                            { nombre: "Estructura de techumbre, cerchas y costaneras" },
+                            { nombre: "Cubierta de techo, membrana y aislación de techumbre" },
+                            { nombre: "Hojalatería, escaleras, barandas y pasamanos" },
+                            { nombre: "Muebles de clóset, calefont/termo y ventilación" }
+                        ]
+                    }
                 ],
 
                 casas: [
@@ -481,8 +651,8 @@
 
                 cargarDatosCloud() {
                     db.collection("obra").doc("partidas").onSnapshot((snapshot) => {
-                        if (snapshot.exists) {
-                            this.partidas = snapshot.data().lista || [];
+                        if (snapshot.exists && snapshot.data().lista) {
+                            this.partidas = snapshot.data().lista;
                         }
                     });
 
@@ -509,32 +679,33 @@
                 abrirCasa(casa) { this.casaSeleccionada = casa; },
                 cerrarCasa() { this.casaSeleccionada = null; },
 
-                vbSupervisorAprobado(partida) {
+                vbSupervisorAprobado(partidaNombre, subNombre) {
                     if (!this.casaSeleccionada) return false;
                     const casaNum = this.casaSeleccionada.numero;
-                    if (!this.estados[casaNum] || !this.estados[casaNum][partida]) return false;
-                    return !!this.estados[casaNum][partida].supervisor;
+                    if (!this.estados[casaNum] || !this.estados[casaNum][partidaNombre] || !this.estados[casaNum][partidaNombre][subNombre]) return false;
+                    return !!this.estados[casaNum][partidaNombre][subNombre].supervisor;
                 },
 
-                vbCalidadAprobado(partida) {
+                vbCalidadAprobado(partidaNombre, subNombre) {
                     if (!this.casaSeleccionada) return false;
                     const casaNum = this.casaSeleccionada.numero;
-                    if (!this.estados[casaNum] || !this.estados[casaNum][partida]) return false;
-                    return !!this.estados[casaNum][partida].calidad;
+                    if (!this.estados[casaNum] || !this.estados[casaNum][partidaNombre] || !this.estados[casaNum][partidaNombre][subNombre]) return false;
+                    return !!this.estados[casaNum][partidaNombre][subNombre].calidad;
                 },
 
-                async cambiarVbSupervisor(partida) {
+                async cambiarVbSupervisor(partidaNombre, subNombre) {
                     if (!this.esCapataz() && !this.esAdmin()) return;
                     if (!this.casaSeleccionada) return;
 
                     const casaNum = this.casaSeleccionada.numero;
                     if (!this.estados[casaNum]) this.estados[casaNum] = {};
-                    if (!this.estados[casaNum][partida]) this.estados[casaNum][partida] = { supervisor: false, calidad: false };
+                    if (!this.estados[casaNum][partidaNombre]) this.estados[casaNum][partidaNombre] = {};
+                    if (!this.estados[casaNum][partidaNombre][subNombre]) this.estados[casaNum][partidaNombre][subNombre] = { supervisor: false, calidad: false };
 
-                    const estadoActual = this.estados[casaNum][partida].supervisor || false;
+                    const estadoActual = this.estados[casaNum][partidaNombre][subNombre].supervisor || false;
                     
-                    this.estados[casaNum][partida] = {
-                        ...this.estados[casaNum][partida],
+                    this.estados[casaNum][partidaNombre][subNombre] = {
+                        ...this.estados[casaNum][partidaNombre][subNombre],
                         supervisor: !estadoActual
                     };
 
@@ -542,18 +713,19 @@
                     await db.collection("obra").doc("estados").set({ mapa: this.estados }, { merge: true });
                 },
 
-                async cambiarVbCalidad(partida) {
+                async cambiarVbCalidad(partidaNombre, subNombre) {
                     if (!this.esCalidad() && !this.esAdmin()) return;
                     if (!this.casaSeleccionada) return;
 
                     const casaNum = this.casaSeleccionada.numero;
                     if (!this.estados[casaNum]) this.estados[casaNum] = {};
-                    if (!this.estados[casaNum][partida]) this.estados[casaNum][partida] = { supervisor: false, calidad: false };
+                    if (!this.estados[casaNum][partidaNombre]) this.estados[casaNum][partidaNombre] = {};
+                    if (!this.estados[casaNum][partidaNombre][subNombre]) this.estados[casaNum][partidaNombre][subNombre] = { supervisor: false, calidad: false };
 
-                    const estadoActual = this.estados[casaNum][partida].calidad || false;
+                    const estadoActual = this.estados[casaNum][partidaNombre][subNombre].calidad || false;
                     
-                    this.estados[casaNum][partida] = {
-                        ...this.estados[casaNum][partida],
+                    this.estados[casaNum][partidaNombre][subNombre] = {
+                        ...this.estados[casaNum][partidaNombre][subNombre],
                         calidad: !estadoActual
                     };
 
@@ -562,34 +734,43 @@
                 },
 
                 calcularAvanceCasa(casaNum) {
-                    if (this.partidas.length === 0) return 0;
+                    let totalSubpartidas = 0;
+                    this.partidas.forEach(p => {
+                        totalSubpartidas += p.subpartidas.length;
+                    });
+                    if (totalSubpartidas === 0) return 0;
                     if (!this.estados[casaNum]) return 0;
 
-                    let puntosTotales = this.partidas.length * 2;
+                    let puntosTotales = totalSubpartidas * 2;
                     let puntosAlcanzados = 0;
 
                     this.partidas.forEach(p => {
-                        const item = this.estados[casaNum][p];
-                        if (item) {
-                            if (item.supervisor) puntosAlcanzados += 1;
-                            if (item.calidad) puntosAlcanzados += 1;
-                        }
+                        p.subpartidas.forEach(sub => {
+                            const item = this.estados[casaNum][p.nombre] && this.estados[casaNum][p.nombre][sub.nombre];
+                            if (item) {
+                                if (item.supervisor) puntosAlcanzados += 1;
+                                if (item.calidad) puntosAlcanzados += 1;
+                            }
+                        });
                     });
 
                     return Math.round((puntosAlcanzados / puntosTotales) * 100);
                 },
 
                 async agregarPartida() {
-                    if (!this.tienePermiso('crear_partidas') || !this.nuevaPartidaNombre.trim()) return;
-                    this.partidas.push(this.nuevaPartidaNombre.trim());
+                    if (this.usuarioAutenticado !== 'jtorres' || !this.nuevaPartidaNombre.trim()) return;
+                    this.partidas.push({
+                        nombre: this.nuevaPartidaNombre.trim(),
+                        subpartidas: [{ nombre: "General" }]
+                    });
                     this.nuevaPartidaNombre = '';
                     await db.collection("obra").doc("partidas").set({ lista: this.partidas });
                 },
 
                 async eliminarPartida(index) {
-                    if (!this.tienePermiso('crear_partidas')) return;
-                    if (confirm('¿Eliminar esta partida de la obra?')) {
-                        const eliminada = this.partidas[index];
+                    if (this.usuarioAutenticado !== 'jtorres') return;
+                    if (confirm('¿Eliminar esta partida principal de la obra?')) {
+                        const eliminada = this.partidas[index].nombre;
                         this.partidas.splice(index, 1);
                         for (let c in this.estados) {
                             if (this.estados[c]) delete this.estados[c][eliminada];
@@ -610,17 +791,23 @@
                 },
 
                 get porcentajeTotal() {
-                    const totalPuntos = this.casas.length * this.partidas.length * 2;
+                    let totalSubpartidas = 0;
+                    this.partidas.forEach(p => {
+                        totalSubpartidas += p.subpartidas.length;
+                    });
+                    const totalPuntos = this.casas.length * totalSubpartidas * 2;
                     if (totalPuntos === 0) return 0;
                     let puntosAlcanzados = 0;
 
                     this.casas.forEach(c => {
                         this.partidas.forEach(p => {
-                            const item = this.estados[c.numero] && this.estados[c.numero][p];
-                            if (item) {
-                                if (item.supervisor) puntosAlcanzados += 1;
-                                if (item.calidad) puntosAlcanzados += 1;
-                            }
+                            p.subpartidas.forEach(sub => {
+                                const item = this.estados[c.numero] && this.estados[c.numero][p.nombre] && this.estados[c.numero][p.nombre][sub.nombre];
+                                if (item) {
+                                    if (item.supervisor) puntosAlcanzados += 1;
+                                    if (item.calidad) puntosAlcanzados += 1;
+                                }
+                            });
                         });
                     });
                     return Math.round((puntosAlcanzados / totalPuntos) * 100);
